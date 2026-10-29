@@ -27,8 +27,11 @@ def rotation():
 def test_variants_recover_diagonalizable_system(factory, rotation):
     A, X = rotation
     m = factory(rank=2, dt=.2).fit(X[:, :60])
-    np.testing.assert_allclose(np.sort_complex(m.eigenvalues_),
-                               np.sort_complex(np.linalg.eigvals(A)), atol=2e-12)
+    # Conjugate eigenvalues can have real parts differing by one ulp. Sorting
+    # lexicographically makes their order depend on the LAPACK build.
+    actual, expected = m.eigenvalues_, np.linalg.eigvals(A)
+    np.testing.assert_allclose(actual[np.argsort(np.angle(actual))],
+                               expected[np.argsort(np.angle(expected))], atol=2e-12)
     np.testing.assert_allclose(m.reconstruct(), X[:, :60], atol=2e-12)
     np.testing.assert_allclose(m.forecast(20), X[:, 60:], atol=3e-12)
     np.testing.assert_allclose(m.predict(X[:, :5]), A @ X[:, :5], atol=2e-12)

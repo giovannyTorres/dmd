@@ -146,7 +146,8 @@ def test_rpca_decomposes_sparse_corruption_and_recovers_dynamics():
     assert model.rpca_residual_ < 1e-7
     assert np.linalg.norm(model.low_rank_ - clean) / np.linalg.norm(clean) < 2e-4
     np.testing.assert_allclose(model.low_rank_ + model.sparse_, clean + sparse, atol=1e-5)
-    assert np.max(np.abs(np.sort_complex(model.eigenvalues_) - np.sort_complex(np.exp(1j * np.array([-0.2, 0.2]))))) < 2e-4
+    actual = model.eigenvalues_[np.argsort(np.angle(model.eigenvalues_))]
+    assert np.max(np.abs(actual - np.exp(1j * np.array([-0.2, 0.2])))) < 2e-4
 
 
 def test_rpca_warns_when_iteration_budget_is_exhausted():
