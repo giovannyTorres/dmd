@@ -1,127 +1,191 @@
-# modaldyn
+# ModalDyn
 
-A compact Dynamic Mode Decomposition toolkit with a NumPy CPU core and an
-optional PyTorch CPU/CUDA backend. It uses snapshot matrices of shape
-**`(features, snapshots)`** and makes device choice explicit.
+**Turn time-ordered snapshots into interpretable modes and short-horizon forecasts.**
 
-Initial research release, version 0.1.0. CUDA execution is implemented; a passing
-CPU suite or skipped CUDA tests do **not** establish validation on GPU hardware.
-See [limitations](docs/limitations.md) and the actual CI/benchmark results for
-the tested configurations. [Documentación en español](README.es.md).
+ModalDyn is a compact Dynamic Mode Decomposition (DMD) toolkit for researchers and
+engineers who want to understand evolving systems, not just fit a black box.
+Start with NumPy, inspect the model's diagnostics, and use the same estimator API
+with optional PyTorch CPU or CUDA execution.
+
+[PyPI](https://pypi.org/project/modaldyn/) ·
+[API guide](https://github.com/giovannyTorres/dmd/blob/main/docs/api.md) ·
+[Examples](https://github.com/giovannyTorres/dmd/tree/main/examples) ·
+[Limitations](https://github.com/giovannyTorres/dmd/blob/main/docs/limitations.md)
+
+## Why ModalDyn?
+
+- **A small starting point.** The basic installation needs only NumPy; PyTorch is optional.
+- **A model you can inspect.** Examine eigenvalues, modes, numerical rank,
+  conditioning and fitted one-step error instead of relying on a forecast alone.
+- **Several workflows, one package.** Reconstruct snapshots, forecast dynamics,
+  include measured controls, or add delay coordinates for partial observations.
+- **Explicit computation.** Choose the backend and device. A request for unavailable
+  CUDA fails clearly rather than silently falling back to CPU.
+
+### Where it fits
+
+These are application ideas, not claims of validation on production datasets:
+
+| Your data | A useful starting question |
+| --- | --- |
+| Time-ordered fluid or simulation fields | Which coherent patterns evolve together, and at which rates? |
+| Vibration or multi-sensor recordings | Can a low-dimensional model describe oscillations and forecast a held-out interval? |
+| Measurements from an actuated experiment | How do the observed states respond to known control inputs? |
+
+DMD approximates dynamics with a linear evolution model. It is especially useful
+when a few modes explain the behavior over the time window you care about.
+Choose rank and other settings on training/validation data, then test a future
+interval that the model has never seen.
 
 ## Install
 
-Install the tagged source release:
+Python **3.10+** and NumPy **1.24+** are required.
 
 ```bash
-python -m pip install 'git+https://github.com/giovannyTorres/dmd.git@v0.1.0'
+python -m pip install modaldyn
 ```
 
-Or from a cloned checkout:
+Optional PyTorch support:
 
 ```bash
-python -m pip install .
+python -m pip install 'modaldyn[torch]'
 ```
 
-Or install a built wheel from the release assets:
+For a specific CPU or CUDA build, follow the
+[official PyTorch installation guide](https://pytorch.org/get-started/locally/).
+The extra does not install a GPU driver or guarantee CUDA availability.
 
-```bash
-python -m pip install modaldyn-0.1.0-py3-none-any.whl
-```
+## Quickstart: forecast a held-out oscillation
 
-Python 3.10+ and NumPy 1.24+ are required. PyTorch is optional. Install the
-appropriate [PyTorch build](https://pytorch.org/get-started/locally/) for your
-CPU or NVIDIA CUDA system, then install `.[torch]`. Installing this extra alone
-does not configure a CUDA driver. PyPI publication requires the separate
-[release setup](docs/releasing.md); a source release is not proof of a PyPI upload.
-
-## Fit, reconstruct and forecast
+Each **column is a snapshot** and each **row is a feature**. In this reproducible
+synthetic example, two sensor channels follow a damped oscillation. The first
+80 snapshots train the model; the last 20 are used only for evaluation.
 
 ```python
 import numpy as np
 from modaldyn import DMD
 
-t = np.arange(160) * 0.1
-snapshots = np.vstack((np.cos(1.3 * t), np.sin(1.3 * t)))
-model = DMD(rank=2, dt=0.1, backend="numpy").fit(snapshots)
+angle = 0.16
+operator = 0.995 * np.array([
+    [np.cos(angle), -np.sin(angle)],
+    [np.sin(angle),  np.cos(angle)],
+])
+snapshots = np.empty((2, 100))  # 2 channels, 100 equally spaced observations
+snapshots[:, 0] = [1.0, 0.2]
+for k in range(99):
+    snapshots[:, k + 1] = operator @ snapshots[:, k]
 
-reconstruction = model.reconstruct()  # includes training index zero
-future = model.forecast(20)          # starts after the final training snapshot
-print(model.eigenvalues_)
-print(model.diagnostics())
+model = DMD(rank=2, dt=0.1).fit(snapshots[:, :80])
+reconstruction = model.reconstruct()  # shape (2, 80), includes the first snapshot
+forecast = model.forecast(20)        # shape (2, 20), starts AFTER the last training point
+truth = snapshots[:, 80:]
+relative_error = np.linalg.norm(forecast - truth) / np.linalg.norm(truth)
+
+print("Reconstruction:", reconstruction.shape)
+print("Forecast:", forecast.shape)
+print("Held-out relative error:", f"{relative_error:.2e}")
+print("Retained rank:", model.diagnostics()["rank"])
+assert relative_error < 1e-10  # check for this noiseless linear example only
 ```
 
-For PyTorch CPU or CUDA, use the same estimator and array orientation:
+The output shapes are `(2, 80)` and `(2, 20)`, with retained rank `2`.
+The error is near numerical precision because the example follows an exact
+linear model. This is a reproducibility check, **not a real-world accuracy claim**.
+For measured data, compare against a simple baseline and evaluate multiple
+held-out windows. Complex-valued modes and forecasts are normal for oscillations;
+only discard the imaginary part when its residual is negligible.
+
+## Example: forecast a system with known controls
+
+Suppose an experiment records two state variables and one actuator input.
+`DMDc` fits the relationship `x[k+1] = A @ x[k] + B @ u[k]`.
+This synthetic example shows the required alignment: **81 state snapshots pair
+with 80 control inputs**, one input for each transition.
 
 ```python
-import torch
-from modaldyn import DMD
+import numpy as np
+from modaldyn import DMDc
 
-x = torch.as_tensor(snapshots, dtype=torch.float64, device="cuda")
-model = DMD(rank=2, backend="torch", device="cuda", dt=0.1).fit(x)
-future = model.forecast(20)  # torch tensor on the selected device
+rng = np.random.default_rng(12)
+A = np.array([[0.93, 0.08], [-0.05, 0.97]])
+B = np.array([[0.15], [0.40]])
+controls = rng.standard_normal((1, 120))
+states = np.empty((2, 121))
+states[:, 0] = [0.4, -0.2]
+for k in range(120):
+    states[:, k + 1] = A @ states[:, k] + B @ controls[:, k]
+
+model = DMDc().fit(states[:, :81], controls[:, :80])
+forecast = model.forecast(controls[:, 80:])  # 40 supplied FUTURE control inputs
+truth = states[:, 81:]
+relative_error = np.linalg.norm(forecast - truth) / np.linalg.norm(truth)
+
+print("Controlled forecast:", forecast.shape)  # (2, 40)
+print("Held-out relative error:", f"{relative_error:.2e}")
+assert forecast.shape == truth.shape
+assert relative_error < 1e-10
 ```
 
-An unavailable CUDA device raises an error. `backend="auto"` follows a tensor's
-backend/device; NumPy input defaults to NumPy unless CUDA is explicitly requested.
-Complex output is expected for oscillatory modes. Convert to real only when its
-imaginary residual is negligible for your application.
+The future controls are inputs you provide, not values predicted by the model.
+Reliable identification needs sufficiently informative state/control data.
+This noiseless example verifies the API and alignment; it does not establish
+performance on a physical experiment.
 
-## Select a variant
+## Pick the right estimator
 
-| Estimator | Intended use | Main assumption or cost |
+| Estimator | Use it when | Keep in mind |
 | --- | --- | --- |
-| `DMD` | Exact spectral DMD | Uniformly sampled snapshots; low-rank linear approximation |
-| `TLSqDMD` | Total-least-squares preprocessing | Errors in both snapshot matrices; choose `tlsq_rank` |
-| `FbDMD` | Forward/backward noise correction | Experimental principal-root convention; spectral ambiguity |
-| `RandomizedDMD` | A seeded randomized range finder | Explicit integer rank; approximation trades accuracy for work |
-| `HankelDMD` | Delay coordinates for partially observed dynamics | More memory; delay count selected on training/validation data |
-| `DMDc` | Measured exogenous controls | Sufficiently exciting state/control data; dense state operator |
-| `RobustDMD` | RPCA preprocessing followed by DMD | Low-rank signal plus sparse corruption; iterative dense SVDs |
-| `StreamingDMD` | Incremental paired snapshots without history | Dense sufficient statistics use O(features²) memory |
+| `DMD` | You want an exact-DMD baseline | Uniform time spacing and a useful low-rank linear approximation |
+| `TLSqDMD` / `FbDMD` | You are exploring noise-aware formulations | Tune TLS rank; forward/backward DMD has experimental spectral-root limits |
+| `RandomizedDMD` | You want a seeded low-rank approximation | Specify an integer rank; measure the accuracy/cost trade-off |
+| `HankelDMD` | Delay coordinates may expose hidden dynamics | More memory; choose delays without leaking test data |
+| `DMDc` | Measured controls influence the evolution | Align each control with its state transition |
+| `RobustDMD` | Sparse corruptions motivate RPCA preprocessing | Assumes low-rank structure plus sparse corruption; iterative dense SVDs |
+| `StreamingDMD` | You cannot retain the full snapshot history | Dense sufficient statistics still need O(features²) memory |
 
-These are established algorithms, not a claim to cover every published DMD
-variant. Optimized/bagged DMD, EDMD, multiresolution and sparsity-promoting DMD
-are outside this release. See [API and alignment rules](docs/api.md).
+See the [API guide](https://github.com/giovannyTorres/dmd/blob/main/docs/api.md)
+for parameters, alignment rules and variant-specific diagnostics.
 
-## What this package adds
+## CPU, PyTorch and CUDA
 
-GPU DMD already exists in flowTorch, and PyDMD has a substantially broader
-variant catalogue. This project's value is its combination of a small NumPy-only
-CPU installation, optional explicit device execution, shared input/rank checks,
-inspectable diagnostics and a reproducible comparison harness. Diagnostics are
-not unique to this package. No claim of universal speed or accuracy superiority
-is made. The [source-backed comparison](docs/comparison.md) explains the evidence
-and qualifications for PyDMD, PyKoopman, datafold and flowTorch.
+The examples above use NumPy on CPU. For the PyTorch backend, use
+`backend="torch", device="cpu"` in the estimator; `device="cuda"` requests CUDA
+explicitly. Forecasts use the selected backend. `backend="auto"` follows an
+input tensor's backend/device; NumPy input defaults to NumPy unless CUDA is
+explicitly requested.
 
-Use `diagnostics()` to inspect the retained rank, backend/device and each
-estimator's available numerical measures. Core DMD reports fitted one-step
-relative error, retained conditioning and spectral radius. A small training
-residual does not establish predictive performance; assess an untouched future
-interval as well.
+**Validation:** CI exercises NumPy on Python 3.10–3.13 and PyTorch on CPU.
+CUDA code and optional tests are included, but GPU hardware correctness and
+performance have **not** been established for this release. Skipped CUDA tests
+are not GPU validation. Small problems may be faster on CPU because transfers
+and synchronization have a cost.
 
-## Reproduce and contribute
+## Scope and trade-offs
 
-```bash
-python -m pip install -e '.[dev]'
-python -m pytest -q
-python examples/quickstart.py
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python benchmarks/benchmark.py \
-  --backends numpy torch-cpu torch-cuda --features 256 --snapshots 160 \
-  --rank 12 --repeats 5 --output benchmarks/results/local.json
-```
+This is an **alpha research package**, not a universal forecasting solution.
+A small training residual does not guarantee useful future predictions.
+Nonstationarity, noise, rank choice and insufficient measurements can all change
+results. Read the [limitations](https://github.com/giovannyTorres/dmd/blob/main/docs/limitations.md)
+before interpreting a model.
 
-Optional backends are explicitly skipped when unavailable. The benchmark records
-software/hardware metadata, warmups, repetitions and accuracy; CUDA timings are
-synchronized. Add `--pydmd` after installing PyDMD for a matched exact-DMD
-comparison. See [benchmark methodology](docs/benchmarking.md).
+ModalDyn favors a compact NumPy-first API and explicit diagnostics/device choice.
+PyDMD offers a broader variant catalogue; GPU-enabled DMD also exists elsewhere.
+There is no claim of universal speed or accuracy superiority. The
+[source-backed comparison](https://github.com/giovannyTorres/dmd/blob/main/docs/comparison.md)
+covers PyDMD, PyKoopman, datafold and flowTorch. Optimized/bagged DMD, EDMD,
+multiresolution DMD and sparsity-promoting DMD are outside this release.
 
-CPU CI runs supported Python versions and a separate PyTorch CPU job. A manual
-CUDA job needs a provisioned GPU runner; it fails if CUDA is unavailable.
-Publications use an independently configured PyPI Trusted Publisher.
+## Learn more and contribute
 
-## Attribution
+- [API reference](https://github.com/giovannyTorres/dmd/blob/main/docs/api.md)
+- [Runnable examples](https://github.com/giovannyTorres/dmd/tree/main/examples)
+- [Validation notes](https://github.com/giovannyTorres/dmd/blob/main/docs/validation.md)
+- [Reproducible benchmarking](https://github.com/giovannyTorres/dmd/blob/main/docs/benchmarking.md)
+- [Report an issue](https://github.com/giovannyTorres/dmd/issues)
+- [Release guide](https://github.com/giovannyTorres/dmd/blob/main/docs/releasing.md)
 
-Original implementation by Giovanny Torres, released under the MIT license.
-Algorithm and comparison references are listed in [docs/comparison.md](docs/comparison.md).
-Please cite the relevant algorithm papers when using these methods in research.
+Original implementation by Giovanny Torres, released under the
+[MIT license](https://github.com/giovannyTorres/dmd/blob/main/LICENSE).
+Please cite the relevant algorithm papers listed in the
+[comparison and references](https://github.com/giovannyTorres/dmd/blob/main/docs/comparison.md)
+when using these methods in research.

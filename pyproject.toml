@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "modaldyn"
-version = "0.1.0"
-description = "Inspectable dynamic mode decomposition on NumPy CPU and PyTorch CPU/CUDA"
+version = "0.1.1"
+description = "Interpretable dynamic mode decomposition, diagnostics and forecasting with NumPy and optional PyTorch"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

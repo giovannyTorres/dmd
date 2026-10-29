@@ -31,7 +31,7 @@ Verify the built wheel outside the source checkout:
 
 ```bash
 python -m venv /tmp/modaldyn-wheel-check
-/tmp/modaldyn-wheel-check/bin/python -m pip install dist/modaldyn-0.1.0-py3-none-any.whl
+/tmp/modaldyn-wheel-check/bin/python -m pip install dist/modaldyn-0.1.1-py3-none-any.whl
 cd /tmp
 /tmp/modaldyn-wheel-check/bin/python -c 'import modaldyn; print(modaldyn.__version__)'
 ```
@@ -43,7 +43,7 @@ include software versions and which GPU checks were skipped.
 ## GitHub release
 
 The repository is `giovannyTorres/dmd`. Commit validated source, create an
-annotated `v0.1.0` tag for that commit, push it, and create a release containing
+annotated `v0.1.1` tag for that commit, push it, and create a release containing
 the wheel, source distribution and checksums. Release notes should identify
 the tested CPU/GPU configurations and current limitations. Never replace an
 already published version with different code; increment the version instead.
@@ -70,7 +70,7 @@ The name was not visible in a public PyPI JSON check, but that does not reserve
 the name or guarantee acceptance.
 
 Run **Publish package** manually from GitHub Actions with the exact tag
-`v0.1.0`. The workflow checks the tag against package metadata, executes tests,
+`v0.1.1`. The workflow checks the tag against package metadata, executes tests,
 builds and validates distributions, and only then starts the `pypi` environment
 job. The PyPI action uses Trusted Publishing and provenance attestations.
 
@@ -84,7 +84,7 @@ from the registry in a fresh environment:
 
 ```bash
 python -m venv /tmp/modaldyn-pypi-check
-/tmp/modaldyn-pypi-check/bin/python -m pip install --index-url https://pypi.org/simple modaldyn==0.1.0
+/tmp/modaldyn-pypi-check/bin/python -m pip install --index-url https://pypi.org/simple modaldyn==0.1.1
 /tmp/modaldyn-pypi-check/bin/python -c 'import modaldyn; print(modaldyn.__version__)'
 ```
 
