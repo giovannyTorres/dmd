@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use ModalDyn, cite this software and the relevant DMD methods listed in docs/comparison.md."
+type: software
+title: "ModalDyn: inspectable DMD on CPU and CUDA"
+authors:
+  - family-names: Torres
+    given-names: Giovanny
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/giovannyTorres/dmd"

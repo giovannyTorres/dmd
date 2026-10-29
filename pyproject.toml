@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "modaldyn"
+version = "0.1.0"
+description = "Inspectable dynamic mode decomposition on NumPy CPU and PyTorch CPU/CUDA"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Giovanny Torres"}]
+keywords = ["dmd", "dynamic-mode-decomposition", "koopman", "gpu", "reduced-order-modeling"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Mathematics",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+torch = ["torch>=2.2"]
+dev = ["pytest>=8", "build>=1.2", "twine>=6", "ruff>=0.8"]
+benchmark = ["pydmd>=2025.8.1"]
+
+[project.urls]
+Homepage = "https://github.com/giovannyTorres/dmd"
+Documentation = "https://github.com/giovannyTorres/dmd/blob/main/docs/api.md"
+Repository = "https://github.com/giovannyTorres/dmd"
+Issues = "https://github.com/giovannyTorres/dmd/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/modaldyn"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "examples", "benchmarks", "docs", "README.md", "README.es.md", "LICENSE", "CHANGELOG.md", "CITATION.cff", "pyproject.toml", ".github"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["cuda: requires a CUDA-enabled PyTorch installation and NVIDIA device"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

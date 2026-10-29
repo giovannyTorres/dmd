@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-29T05:46:46.930320+00:00",
+  "parameters": {
+    "features": 256,
+    "snapshots": 160,
+    "holdout": 20,
+    "rank": 12,
+    "seed": 7,
+    "dtype": "float64",
+    "warmups": 1,
+    "repeats": 5,
+    "backends": [
+      "numpy",
+      "torch-cpu",
+      "torch-cuda"
+    ],
+    "pydmd": true,
+    "output": "benchmarks/results/local-comparison.json"
+  },
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "versions": {
+      "modaldyn": "0.1.0",
+      "numpy": "2.3.5",
+      "torch": "2.15.0+cpu",
+      "pydmd": "2025.8.1"
+    },
+    "thread_settings": {
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": null
+    }
+  },
+  "methodology": {
+    "algorithm": "exact DMD, fixed rank, first-snapshot amplitudes",
+    "data": "synthetic stable real low-rank oscillations; contiguous training / held-out future split",
+    "timed": "fit only, including validation and any internal diagnostics; construction and explicit input transfer excluded",
+    "gpu_timing": "synchronized before and after each measured fit",
+    "comparability": "Implementation work differs, including diagnostics and internal CPU/GPU transfers; no universal speed claim",
+    "forecast_alignment": "first forecast column is one step after last training snapshot",
+    "forecast_anchoring": "All backends project the last observed training state onto fitted modes; PyDMD rollout uses its public modes/eigs explicitly",
+    "cuda_memory": "peak allocated PyTorch bytes, including resident input; not total device memory"
+  },
+  "results": [
+    {
+      "backend": "numpy",
+      "status": "ok",
+      "fit_seconds": [
+        0.003873090000013235,
+        0.004824633999987782,
+        0.00417427399997905,
+        0.004873694999957934,
+        0.007687853999982508
+      ],
+      "median_fit_seconds": 0.004824633999987782,
+      "min_fit_seconds": 0.003873090000013235,
+      "one_step_relative_error": 4.085290015658843e-15,
+      "reconstruction_relative_error": 8.34095658784437e-14,
+      "holdout_relative_error": 1.2759204202909417e-14,
+      "eigenvalue_count": 12,
+      "warnings": []
+    },
+    {
+      "backend": "torch-cpu",
+      "status": "ok",
+      "fit_seconds": [
+        0.0062305750000177795,
+        0.00630188000002363,
+        0.00810867400002735,
+        0.005378979999989042,
+        0.0053192519999925025
+      ],
+      "median_fit_seconds": 0.0062305750000177795,
+      "min_fit_seconds": 0.0053192519999925025,
+      "one_step_relative_error": 2.3575274439990167e-15,
+      "reconstruction_relative_error": 9.190730411032835e-14,
+      "holdout_relative_error": 1.3448832041939008e-14,
+      "eigenvalue_count": 12,
+      "warnings": [],
+      "torch_num_threads": 1,
+      "torch_matmul_precision": "highest",
+      "torch_allow_tf32": false
+    },
+    {
+      "backend": "torch-cuda",
+      "status": "skipped",
+      "reason": "CUDA is unavailable"
+    },
+    {
+      "backend": "pydmd",
+      "status": "ok",
+      "fit_seconds": [
+        0.005995459000018855,
+        0.006185098000003109,
+        0.005570771999998669,
+        0.006000505999963934,
+        0.006615173000000141
+      ],
+      "median_fit_seconds": 0.006000505999963934,
+      "min_fit_seconds": 0.005570771999998669,
+      "one_step_relative_error": 2.9482426937251904e-15,
+      "reconstruction_relative_error": 7.491756701132716e-14,
+      "holdout_relative_error": 1.0865410443380588e-14,
+      "eigenvalue_count": 12,
+      "warnings": [
+        "UserWarning: Input data condition number 9.09337372594548e+16. Consider preprocessing data, passing in augmented data\nmatrix, or regularization methods."
+      ]
+    }
+  ]
+}
