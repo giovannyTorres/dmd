@@ -149,7 +149,7 @@ regardless of batch length, so changing batching changes the weighting.
 Call `finalize()` after the last batch to compute `operator_ = H @ pinv(G)`.
 Each new partial fit invalidates finalized outputs. `fit(X, Y=None)` resets and
 finalizes in one call. `rank` is None or a positive integer and truncates G's
-pseudoinverse; it does not reduce O(n_features�) statistic storage. Forming G
+pseudoinverse; it does not reduce O(n_features²) statistic storage. Forming G
 squares the condition number of the snapshots, so batch SVD can be preferable.
 
 `predict(X)` advances states one step. `forecast(x0, n_steps)` explicitly takes
