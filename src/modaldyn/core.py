@@ -32,9 +32,10 @@ class DMD:
                 _integer(rank, "rank", 1)
             elif not 0 < rank <= 1:
                 raise ValueError("energy rank must lie in (0,1]")
-        if not np.isfinite(dt) or dt <= 0:
+        if isinstance(dt, bool) or not isinstance(dt, numbers.Real) or not np.isfinite(dt) or dt <= 0:
             raise ValueError("dt must be finite and positive")
-        if rcond is not None and (not np.isfinite(rcond) or not 0 <= rcond < 1):
+        if rcond is not None and (isinstance(rcond, bool) or not isinstance(rcond, numbers.Real)
+                                  or not np.isfinite(rcond) or not 0 <= rcond < 1):
             raise ValueError("rcond must lie in [0,1)")
         self.rank, self.backend, self.device, self.dt = rank, backend, device, float(dt)
         self.tlsq_rank = _integer(tlsq_rank, "tlsq_rank")
@@ -106,7 +107,8 @@ class DMD:
             # Same spatial basis in both directions; root of Af Ab^{-1}.
             Xr, Yr = b.matmul(U.conj().T, X), b.matmul(U.conj().T, Y)
             Ab = b.matmul(Xr, b.pinv(Yr, self.rcond))
-            if b.norm(Ab) == 0 or int(b.scalar((b.svd(Ab)[1] > max(Ab.shape) * eps * b.svd(Ab)[1][0]).sum())) < rank:
+            backward_s = b.svd(Ab)[1]
+            if b.norm(Ab) == 0 or int(b.scalar((backward_s > max(Ab.shape) * eps * backward_s[0]).sum())) < rank:
                 raise ValueError("Backward operator is singular; forward/backward DMD is undefined")
             C = b.matmul(A, b.pinv(Ab, self.rcond))
             values, W = b.eig(C)

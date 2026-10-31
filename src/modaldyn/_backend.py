@@ -58,7 +58,8 @@ class Backend:
         if self.name == "torch":
             dtype = self.xp.promote_types(a.dtype, b.dtype)
             return a.to(dtype), b.to(dtype)
-        return a, b
+        dtype = np.result_type(a.dtype, b.dtype)
+        return a.astype(dtype, copy=False), b.astype(dtype, copy=False)
 
     def matmul(self, a, b):
         a, b = self._promote(a, b)
@@ -86,7 +87,11 @@ class Backend:
         return x.item() if hasattr(x, "item") else x
 
     def norm(self, x):
-        return float(self.scalar(self.xp.linalg.norm(x)))
+        size = x.size if self.name == "numpy" else x.numel()
+        scale = float(self.scalar(abs(x).max())) if size else 0.0
+        if scale == 0:
+            return 0.0
+        return scale * float(self.scalar(self.xp.linalg.norm(x / scale)))
 
     def concat(self, arrays, axis=0):
         return self.xp.concatenate(arrays, axis=axis) if self.name == "numpy" else self.xp.cat(arrays, dim=axis)

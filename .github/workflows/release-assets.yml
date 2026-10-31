@@ -35,6 +35,7 @@ jobs:
       - run: python -m pytest -q -rs
       - run: python -m build
       - run: python -m twine check dist/*.whl dist/*.tar.gz
+      - run: python scripts/check_artifacts.py
       - name: Compute distribution checksums
         working-directory: dist
         run: sha256sum *.whl *.tar.gz > SHA256SUMS

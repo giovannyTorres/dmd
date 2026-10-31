@@ -341,26 +341,31 @@ class RobustDMD(DMD):
         mu, mu_max = 1.25 / spectral, 1.25e7 / spectral
         self.rpca_converged_ = False
         for iteration in range(1, self.rpca_max_iter + 1):
+            previous_sparse = sparse
+            u, s, vh = b.svd(data - sparse + dual / mu)
+            shrunk = (s - 1 / mu).clip(0)
+            low = (u * shrunk) @ vh
             value = data - low + dual / mu
             magnitude = abs(value)
             # Clamp avoids undefined complex phase at zero for both backends.
             thresholded = (magnitude - lam / mu).clip(0)
-            sparse = value * thresholded / magnitude.clip(tiny)
-            u, s, vh = b.svd(data - sparse + dual / mu)
-            shrunk = (s - 1 / mu).clip(0)
-            low = (u * shrunk) @ vh
+            sparse = (value / magnitude.clip(tiny)) * thresholded
             residual = data - low - sparse
+            dual = dual + mu * residual
             relative = b.norm(residual) / norm_data
-            if relative <= self.rpca_tol:
+            dual_error = mu * b.norm(sparse - previous_sparse) / max(1.0, b.norm(dual))
+            error = max(relative, dual_error)
+            if error <= self.rpca_tol:
                 self.rpca_converged_ = True
                 break
-            dual = dual + mu * residual
-            mu = min(mu * 1.5, mu_max)
+            if relative > dual_error:
+                mu = min(mu * 1.5, mu_max)
         self.low_rank_, self.sparse_ = low, sparse
         self.rpca_iterations_, self.rpca_residual_ = iteration, relative
+        self.rpca_dual_error_, self.rpca_error_ = dual_error, error
         self.rpca_lambda_ = lam
         if not self.rpca_converged_:
-            warnings.warn("RPCA did not converge within rpca_max_iter; inspect rpca_residual_",
+            warnings.warn("RPCA did not converge within rpca_max_iter; inspect rpca_error_",
                           RuntimeWarning, stacklevel=2)
         return super().fit(low)
 
@@ -368,5 +373,6 @@ class RobustDMD(DMD):
         result = dict(super().diagnostics())
         result.update(variant="rpca_dmd", rpca_converged=self.rpca_converged_,
                       rpca_iterations=self.rpca_iterations_, rpca_residual=self.rpca_residual_,
+                      rpca_dual_error=self.rpca_dual_error_, rpca_error=self.rpca_error_,
                       rpca_lambda=self.rpca_lambda_)
         return result

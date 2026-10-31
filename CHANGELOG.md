@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.2 (2026-10-30)
+
+- Promote mixed-precision snapshot pairs before estimating numerical rank.
+- Require primal feasibility and dual stability in RobustDMD preprocessing;
+  pause penalty growth while the components are still changing.
+- Expose `rpca_error_` and `rpca_dual_error_` in fitted state and diagnostics.
+- Scale norm calculations to avoid underflow/overflow in diagnostics.
+- Reject invalid sampling/cutoff parameters consistently and reuse the
+  backward operator's singular spectrum.
+- Validate wheel and source installs separately, with no PyTorch dependency,
+  runnable examples, version checks, dependency checks, and SHA-256 hashes.
+
 ## 0.1.1
 
 Documentation-focused release. Algorithms and public APIs are unchanged.

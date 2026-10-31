@@ -5,6 +5,6 @@ title: "ModalDyn: inspectable DMD on CPU and CUDA"
 authors:
   - family-names: Torres
     given-names: Giovanny
-version: 0.1.1
+version: 0.1.2
 license: MIT
 repository-code: "https://github.com/giovannyTorres/dmd"

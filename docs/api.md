@@ -8,6 +8,10 @@ may be complex even when all measurements are real. Mode order, phase and scalin
 need not match across eigensolvers; compare spectra up to permutation and compare
 reconstructed dynamics rather than raw mode columns.
 
+Explicit X/Y pairs are promoted to a common dtype before computing numerical
+rank on both NumPy and PyTorch. In particular, float64 targets promote float32
+inputs to float64; information already rounded out of the inputs is not restored.
+
 `backend="numpy"` selects CPU, `backend="torch"` selects PyTorch, and
 `backend="auto"` follows a torch input or an explicitly requested CUDA device;
 otherwise it selects NumPy. A torch input keeps its device when none is given.
@@ -121,7 +125,12 @@ only. The default sparsity penalty is `1/sqrt(max(X.shape))`. Inspect
 the iteration limit emits a warning. This two-stage pipeline assumes low-rank
 structure and sparse corruption. Its reconstruction/forecast describe the
 estimated clean component. Its DMD residual is computed on that component;
-the RPCA residual is a separate convergence measure. It is not guaranteed to
+the RPCA residual is a separate feasibility measure. `rpca_dual_error_` measures
+normalized component change, and `rpca_error_` is the maximum of the primal
+residual and dual error. Both must be at most `rpca_tol` for convergence.
+The penalty increases only while primal error exceeds dual error; a small
+feasibility residual alone is insufficient. These values also appear in
+`diagnostics()`. It is not guaranteed to
 improve dense-noise estimation or held-out forecasts.
 
 ## Streaming sufficient statistics
@@ -140,7 +149,7 @@ regardless of batch length, so changing batching changes the weighting.
 Call `finalize()` after the last batch to compute `operator_ = H @ pinv(G)`.
 Each new partial fit invalidates finalized outputs. `fit(X, Y=None)` resets and
 finalizes in one call. `rank` is None or a positive integer and truncates G's
-pseudoinverse; it does not reduce O(n_features²) statistic storage. Forming G
+pseudoinverse; it does not reduce O(n_features�) statistic storage. Forming G
 squares the condition number of the snapshots, so batch SVD can be preferable.
 
 `predict(X)` advances states one step. `forecast(x0, n_steps)` explicitly takes
